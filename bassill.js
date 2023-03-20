@@ -199,12 +199,18 @@ bsv = "2112211221122222"
 
 //BS = sinify( lp( mseq( bsb, 10 ), .1 * 2 ** ((t>>12) / 12 ) ) ) ,
 
-BS = sinify( lp( mseq( bsb, 10 ), .25 * 2 ** ( seq( bsb, 10) / 12) ) ) ,
+BS = x => sinify( lp( mseq( bsb, 10 ), x * 2 ** ( seq( bsb, 10) / 12) ) ) ,
 
 
-BSvel = min ( 1, beat( bsv, 11, 1, 4e2 ) ),
+BSvel = x => min ( 1, beat( bsv, 11, 1, x ) ),
 
-BS * lp( BSvel, .01)
+//m( BS(.25) * lp( BSvel( 2e2 ), .01), .7) + m( BS(999) * lp( BSvel( 9e2 ), .01), .3)
+
+m( BS(.25) * lp( BSvel( 2e2 ), .01), .7) + m( lp( BS(999), 3), .3)
+
+
+//,m( lp( BS(999), 3), .5)
+
 
 //lp(min( BS, beat( bsv, 11, 1, 5e9 ) ), 5)
 
