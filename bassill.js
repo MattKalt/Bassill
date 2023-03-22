@@ -155,7 +155,7 @@ sy = synth = (melody, velTrack, speed, x, y, ...z)=>
 	lp(
 		min(
 			m(
-				hm2(
+				hm(
 					beat( [x], 10, 6e4, 1, melody, .02* ( (y>>24) & 255 ) )
 				, ( y>>16 ) & 255, ...z
 				)
@@ -240,6 +240,8 @@ BSvel = x => min ( 1, beat( bsv, 11, 1, x ) ),
 
 Bas = m( BS(.25) * lp( BSvel( 2e2 ), .01), .7) + m( lp( BS(999), 3), .3),
 
+Wvel = [.5, .5, .5, .5, 1, 1, 1, 1],
+
 //W = synth( sinify( mseq( w, 10 )) / 4, [.5, .5, .5, .5, 1, 1, 1, 1], 10, 1, 0x71060499, 1024 / PI * t2/t | 0), //octaved
 //W = synth( sinify( mseq( w, 10 )) / 4, [.5, .5, .5, .5, 1, 1, 1, 1], 10, 1.01, 0x72060499, 128 * t2/t | 0), //cool acid-y shamisen
 //W = synth( mseq( w, 10 ), [.5, .5, .5, .5, 1, 1, 1, 1], 10, 1, 0x72060409), //muffled but still 2 high
@@ -261,9 +263,17 @@ W = synth( mseq( w, 10 ), [.5, .5, .5, .5, 1, 1, 1, 1], 10, 1.5, 0x79018509), //
 //W = synth( sinify( mseq( w, 10 )) / 4, [.5, .5, .5, .5, 1, 1, 1, 1], 10, 1, 0x2EEF0399, 1024 / PI * t2/t | 0), //octaved
 //W = synth( sinify( mseq( w, 10 )) / 4, [.5, .5, .5, .5, 1, 1, 1, 1], 10, 1, 0x04E00101, 1024 * t2/t | 0),//trumpet w/ buzz
 
-rot = offset => .5 + sin( offset + t * PI / 2 ** 11 )/2,
+w2 = transpose( w, -5),
 
-Bas * .9 + hp(W, 8 * rot(19)**2 ) * .1
+W2 = synth( mseq( w2, 10 ), Wvel, 10, 2.1, 0x9501F209),
+
+rot = (speed, offset) => .5 + sin( offset + t * PI / 2 ** speed )/2,
+
+Master = pan => Bas * .5 + lp( Bas, 1 ) * .4 + hp( W, 8 * rot( 11, pan ? 19 : 7 )**2 ) * .05 + W2 * .05,
+
+//[ lim( Master(0), 1e-3), lim( Master(1), 1e-3)]
+
+[ Master(0), Master(1) ]
 
 
 //suck:
