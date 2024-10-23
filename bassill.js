@@ -7,6 +7,8 @@ t2 = t,
 //Change t here, not below, or it messes with the snare/hihat sounds
 t *= 8 / 49,
 
+t-=t/8&128,
+
 // Repeat x beats of y
 // SUPER useful if you're writing complex beats/melodies
 // Include this or the FXs won't work (or you could replace r(x, y) with Array(x).fill(y))
@@ -91,7 +93,7 @@ hp = hipass = (x, f) => (x % 256) ^ lp(x, f),
 
 //sp = speed
 lim = limiter = (x, sp = .1) => (
-	x &= 255,
+	//x &= 255,
 	mi = fx[fxi] = min( fx[fxi] + sp, x, 255),
 	mx = fx[fxi + 1] = max( fx[fxi + 1] - sp, x, mi+9),
 	fxi += 2,
@@ -115,7 +117,7 @@ lim = limiter = (x, sp = .1) => (
 
 // XORs the input with its harmonics, controlled by the bits of a number ('tone')
 // Unoptimized version
-hm2= harmonify = (x,tone) => {
+hm = harmonify = (x,tone) => {
 	o = 0;
 	//len=8;
 	len = log2(tone) + 1;
@@ -126,9 +128,10 @@ hm2= harmonify = (x,tone) => {
 },
 
 
+
 // Instead of computing on the fly, this version computes a wavetable at the start
 // Side effects: you can't start the song at any t, and output is always full-volume
-hm = harmonify = (x, tone, waveTableSize = 256 * t2/t | 0 ) => {
+hm3 = harmonify = (x, tone, waveTableSize = 256 * t2/t | 0 ) => {
 	//play from the buffer
 	if( t2 > waveTableSize) {
 		o = fx[ fxi + ( x * t2 / t & waveTableSize - 1) ];
@@ -221,33 +224,57 @@ w = r(1, [
 	wa, wb, wa, wc
 ]),
 
+//Wvel = [1, 1, 2, 2],
+
+/*
+Wvel1 = [0,1,2,2],
+
+Wvel = r(1, [
+	r(6, Wvel1),
+	r(2, [1, 1, 2, 2] )
+]),
+*/
+
+Wvel1 = [0, 0, 1, .5, 0, 1, 1, 1],
+
+Wvel = r(1, [
+	r(6, Wvel1),
+	r(2, [1, 0, 1, 0, 1, 1, 1, 1])
+]),
+
 0
 ),
-
-
 //---------------- MIXER
 
 //BS = sinify( lp( mseq( bsb, 10 ), .1 + .05 * (t>>14) ) ) ,
 
 //BS = sinify( lp( mseq( bsb, 10 ), .1 * 2 ** ((t>>12) / 12 ) ) ) ,
 
+swang = t-(t/4&256),
+
+//BS = x => sinify( lp( mseq( bs, 10, swang ), x * 2 ** ( seq( bsb, 10) / 12) ) ) ,
 BS = x => sinify( lp( mseq( bs, 10 ), x * 2 ** ( seq( bsb, 10) / 12) ) ) ,
 
 
+//BSvel = x => min ( 1, beat( bsv, 11, 1, x, swang ) ),
 BSvel = x => min ( 1, beat( bsv, 11, 1, x ) ),
+
 
 //m( BS(.25) * lp( BSvel( 2e2 ), .01), .7) + m( BS(999) * lp( BSvel( 9e2 ), .01), .3)
 
 Bas = m( BS(.25) * lp( BSvel( 2e2 ), .01), .7) + m( lp( BS(999), 3), .3),
 
-Wvel = [1, 1, 2, 2],
+
 
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x71060499, 1024 / PI * t2/t | 0), //octaved
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1.01, 0x72060499, 128 * t2/t | 0), //cool acid-y shamisen
 //W = synth( mseq( w, 10 ),Wvel, 11, 1, 0x72060409), //muffled but still 2 high
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1.1, 0x73030409, 512 / PI * t2/t | 0), //sorta piano-ish
 //W = synth( mseq( w, 10 ), Wvel, 11, 1.5, 0x79018509), //sorta corny guitar
-W = synth( sinify( mseq( w, 10 )) / 4, Wvel, 11, 1.1, 0x79018509, 1024 / PI * t2/t | 0), //guitar
+//W = synth( mseq( w, 10 ), Wvel, 11, 1.6, 0x79018F10), //extreme guitar when lim((bas+W)&255)
+//W = synth( mseq( w, 10 ), Wvel, 11, 1.4, 0x79018F10), //dubsteppy thing when lim((bas+W)&255)
+//W = synth( mseq( w, 10 ), Wvel, 11, .5, 0x29020f10), //dubsteppy thing when lim(bas+W)
+//W = synth( sinify( mseq( w, 10 )) / 4, Wvel, 11, 1.1, 0x79018509, 1024 / PI * t2/t | 0), //guitar
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1.5, 0x79018509), //guitar 2
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1.1, 0x79098509, 256 / PI * t2/t | 0), //guitar oct up
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x81018509, 1024 / PI * t2/t | 0), //upright bass-ish
@@ -258,7 +285,9 @@ W = synth( sinify( mseq( w, 10 )) / 4, Wvel, 11, 1.1, 0x79018509, 1024 / PI * t2
 //W = synth( mseq( w, 10 ),Wvel, 11, 3.4, 0x09600F99), //pure phone ring
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 3.3, 0x03010F01), //buzzy superbassy
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 3.3, 0x05010FF1), //square
-//W = synth( mseq( w, 10 ),Wvel, 11, 3.3, 0x0E0204F1), //cool acid-y bass
+//W = synth( mseq( w, 10 ),Wvel, 10, 3.3, 0x0E0204F1), //cool acid-y bass
+//W = synth( mseq( w, 10 ),Wvel, 10, 3.3, 0x0E120310)*.7, //brosteppy
+W = synth( mseq( w, 10 ),Wvel, 10, 5.7, 0x1E12010f)*.7, //goofy hi guitar
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 2.1, 0x95010699, 1024 / PI * t2/t | 0), //weird2
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x2EEF0399, 1024 / PI * t2/t | 0), //octaved
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x04E00101, 1024 * t2/t | 0),//trumpet w/ buzz
@@ -269,9 +298,20 @@ W2 = synth( mseq( w2, 10 ), Wvel, 10, 2.1, 0x9501F209),
 
 rot = (speed, offset) => .5 + sin( offset + t * PI / 2 ** speed )/2,
 
-Master = pan => Bas * .5 + lp( Bas, 1 ) * .4 + hp( W, 8 * rot( 11, pan ? 19 : 7 )**2 ) * .05 + W2 * .005,
+Master = pan => (
+
+//Bas * .5 + lp( Bas, 1 ) * .4 + hp( W, 8 * rot( 11, pan ? 19 : 7 )**2 ) * .05 + W2 * .005
+
+//lim( 
+
+lim( Bas + W/2, .01 )
+
+//,.01)
+
+),
 
 //[ lim( Master(0), 1e-3), lim( Master(1), 1e-3)]
+
 
 [ Master(0), Master(1) ]
 
@@ -279,6 +319,7 @@ Master = pan => Bas * .5 + lp( Bas, 1 ) * .4 + hp( W, 8 * rot( 11, pan ? 19 : 7 
 //suck:
 //W = synth( mseq( w, 10 ),Wvel, 11, 3.3, 0x0D020FF1), //ultrahigh phone
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1.3, 0x36020399, 1024 / PI * t2/t | 0), //what
+//W = synth( mseq( w, 10 ) ,Wvel, 10, 3.26, 0x0E0204F1), //bleeps
 
 //hp( W, .5 + sin( t / (2 << 11) ) / 2)
 
