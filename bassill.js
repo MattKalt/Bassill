@@ -7,7 +7,7 @@ t2 = t,
 //Change t here, not below, or it messes with the snare/hihat sounds
 t *= 8 / 49,
 
-t-=t/8&128,
+t-=t/8&128, //SWANG
 
 // Repeat x beats of y
 // SUPER useful if you're writing complex beats/melodies
@@ -332,9 +332,11 @@ W = synth( mseq( w, 10 ),Wvel, 10, 3.3, 0x0E020441), //cool acid-y bass
 
 //LA = synth( mseq( la, 10 ) * 4, [1], 10, 3.3, 0x94010199), //super hi pitch bells
 //LA = synth( mseq( la, 10 ) * 1, [1], 10, 3.3, 0x95010599), //sorta octaved tri
-LA = synth( mseq( la, 10 ) * 1, [1], 10, 3.3, 0x73030409), //sorta guitar
+//LA = synth( mseq( la, 10 ) * 2, [1], 10, 3.3, 0x73030409), //sorta guitar
 
-LB = synth( mseq( lb, 10 ) * 1, [1], 10, 3.3, 0x73030409), //sorta guitar
+LA = synth( mseq( la, 10 ) * 1, [1], 10, 3.3, 0x72060219), //shamisen-ish
+LB = synth( mseq( lb, 10 ) * 1, [1], 10, 3.3, 0x72060219), //shamisen-ish
+
 
 w2 = transpose( w, -5),
 
@@ -348,7 +350,7 @@ Master = pan => (
 
 //lim( 
 
-lim( Bas + W/6 + W2/2 + (pan ? LA : LB)/4, .01 )
+lim( Bas * 1.5 + W/6 + W2/2 + (pan ? LA : LB)/4, .03 )
 
 //,.01)
 
