@@ -176,7 +176,10 @@ s2s = sinify = x => sin( x*PI/64 ) * 126 + 128,
 
 v = vibrato = sin(t2>>10)/2,
 
-
+ht = halftime = arr => (
+	arr = r(1,arr), //flatten
+	r(arr.length * 2).map( (e,i) => arr[i/2|0] )
+),
 
 //------------------ SEQUENCES -----------------------------------
 
@@ -224,23 +227,34 @@ w = r(1, [
 	wa, wb, wa, wc
 ]),
 
-//Wvel = [1, 1, 2, 2],
-
-/*
-Wvel1 = [0,1,2,2],
-
-Wvel = r(1, [
-	r(6, Wvel1),
-	r(2, [1, 1, 2, 2] )
-]),
-*/
-
 Wvel1 = [0, 0, 1, .5, 0, 1, 1, 1],
 
 Wvel = r(1, [
 	r(6, Wvel1),
 	r(2, [1, 0, 1, 0, 1, 1, 1, 1])
 ]),
+
+la1 = r(1, [ 
+	r(2, [
+		15, 14, 7, 12, 10, 10
+	]),
+	15, 14, 15, 17,
+	
+]),
+
+la2 = r( 1, [
+	19, 19, 12, 12,
+	5, 7, 10, 12,
+	ht( [ 15, 17, 15, 14 ] ),
+]),
+
+la3 = [
+	19, 15, 10, 15, 19, 15, 19, 20,
+	17, 13, 8, 13, 17, 13, 8, 13
+],
+
+
+la = r(1, [la1, la2, la1, la3]),
 
 0
 ),
@@ -292,6 +306,8 @@ W = synth( mseq( w, 10 ),Wvel, 10, 3.3, 0x0E020441), //cool acid-y bass
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x2EEF0399, 1024 / PI * t2/t | 0), //octaved
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x04E00101, 1024 * t2/t | 0),//trumpet w/ buzz
 
+LA = synth( mseq( la, 10 ) * 4, [1], 10, 3.3, 0x94010199), //pure phone ring
+
 w2 = transpose( w, -5),
 
 W2 = synth( mseq( w2, 10 ), Wvel, 10, 2.1, 0x9501F209),
@@ -304,7 +320,7 @@ Master = pan => (
 
 //lim( 
 
-lim( Bas + W/3 + W2, .01 )
+lim( Bas + W/6 + W2/2 + LA/8, .01 )
 
 //,.01)
 
