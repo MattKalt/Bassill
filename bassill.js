@@ -253,8 +253,32 @@ la3 = [
 	17, 13, 8, 13, 17, 13, 8, 13
 ],
 
-
 la = r(1, [la1, la2, la1, la3]),
+
+lb1 = r(1, [
+	r(2, [
+		24, 19, 12, 19, 17, 19
+	]),
+	24, 22, 24, 26
+]),
+
+lb2 = [
+	27, 26, 24, 24,
+	24, 22, 19, 19,
+	19, 22, 24, 26,
+	24, 22, 19, 22
+],
+
+lb3 = r(1, [
+	r(2, [
+	27, 22, 19, 22
+	]),
+	r(2,[
+	25, 20, 17, 20
+	])
+]),
+
+lb = r(1, [ lb1, lb2, lb1, lb3 ] ),
 
 0
 ),
@@ -306,7 +330,11 @@ W = synth( mseq( w, 10 ),Wvel, 10, 3.3, 0x0E020441), //cool acid-y bass
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x2EEF0399, 1024 / PI * t2/t | 0), //octaved
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x04E00101, 1024 * t2/t | 0),//trumpet w/ buzz
 
-LA = synth( mseq( la, 10 ) * 4, [1], 10, 3.3, 0x94010199), //pure phone ring
+//LA = synth( mseq( la, 10 ) * 4, [1], 10, 3.3, 0x94010199), //super hi pitch bells
+//LA = synth( mseq( la, 10 ) * 1, [1], 10, 3.3, 0x95010599), //sorta octaved tri
+LA = synth( mseq( la, 10 ) * 1, [1], 10, 3.3, 0x73030409), //sorta guitar
+
+LB = synth( mseq( lb, 10 ) * 1, [1], 10, 3.3, 0x73030409), //sorta guitar
 
 w2 = transpose( w, -5),
 
@@ -320,7 +348,7 @@ Master = pan => (
 
 //lim( 
 
-lim( Bas + W/6 + W2/2 + LA/8, .01 )
+lim( Bas + W/6 + W2/2 + (pan ? LA : LB)/4, .01 )
 
 //,.01)
 
