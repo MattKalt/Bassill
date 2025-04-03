@@ -2,7 +2,7 @@
 
 
 //Original t, increments one per sample. The reverb, harmonifier, hihat, and snare need this.
-t2 = t,
+T = t,
 
 //Change t here, not below, or it messes with the snare/hihat sounds
 t *= 8 / 49,
@@ -11,7 +11,7 @@ t-=t/8&128, //SWANG
 
 // Repeat x beats of y
 // SUPER useful if you're writing complex beats/melodies
-// Include this or the FXs won't work (or you could replace r(x, y) with Array(x).fill(y))
+// Include this or the Fs won't work (or you could replace r(x, y) with Array(x).fill(y))
 // r(1,[arrays]) also serves as a replacement for [arrays].flat()
 r = repeat = (x, y) => Array( x ).fill( y ).flat( 9 ),
 
@@ -46,63 +46,75 @@ mseq = (...x) => t * 2 ** (seq(...x) / 12),
 bt = beat = (arr, spd, vel = 2e4, vol = 1, T = t, oct = 0) =>
 	m(vel / (T & (2 ** (spd - oct) / seq( arr, spd ) ) - 1), vol),
 
-ls = sin(t2 / 9 & t2 >> 5), // long snare
+ls = sin(T / 9 & T >> 5), // long snare
 //s = sin(t>>5), // acoustic-sounding grungy snare
 //s = (((t*8/48)>>9) & 1) ? 0 : sin(t / 9 & t >> 5), // Snare
 s = seq( [ls, 0], 9), // Snare
 S = seq( [ls, 0], 8), // double snare
 //s = sin((t | t * .7) >> 4), // quieter snare
 //h = 1 & t * 441/480, // long Hihat
-h = 1 & t2 * 441/480, // long Hihat
+h = 1 & T * 441/480, // long Hihat
 h = seq( [h,h,h,0], 8), //quieter, faster attack
 
 
 
-// The FX rack, stores memory for use in effects
+// The F rack, stores memory for use in effects
 // Automatically keeps track of what's stored where
 // If you see red (NaNs), raise 5e4 higher, or adjust your reverbs' 'dsp' variable
-// Works best when FX are not inside conditionals (meaning the number of FX in use changes)
+// Works best when F are not inside conditionals (meaning the number of F in use changes)
 // But even then, should only create a momentary click/pop (might be more severe for reverb)
-// You can also set it to [] and modify the effects to read m(fx[stuff]) to get around NaN issues
+// You can also set it to [] and modify the effects to read m(F[stuff]) to get around NaN issues
 //    ^(this gets rid of the lag when editing, but sparse arrays might be slower during runtime)
-t ? 0 : fx = r( 4e4, 0 ),
+t ? 0 : F = r( 4e4, 0 ),
 // Iterator, resets to 0 at every t
-fxi = 0,
+I = 0,
 
 //dsp = downsample the bitrate of the reverb, dsp=2 cuts uses half as much space, 3 uses 1/3, etc
-rv = reverb = (x, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 2, T=t2) => (
-	ech = y => fxi + ( 0|(y % len) / dsp ),
-	x = x*dry + wet*fx [ech(T) ] || 0,
-	t2 % dsp ? 0 : fx[ ech(t2) ] = x * feedb,
-	fxi += 0|(len / dsp),
+rv = reverb = (x, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 2, T=T) => (
+	ech = y => I + ( 0|(y % len) / dsp ),
+	x = x*dry + wet*F [ech(T) ] || 0,
+	T % dsp ? 0 : F[ ech(T) ] = x * feedb,
+	I += 0|(len / dsp),
 	x
 ),
 
 
 lp = lopass = (x, f) => ( // f ~= frequency, but not 1:1
-	// fx[fxi] is the value of the last sample
+	// F[I] is the value of the last sample
 	// You will need to change the 'x % 256' if you're using signed or floatbeat
-	x = min( max( x % 256, fx[fxi] - f), fx[fxi] + f), // Clamp the change since last sample between (-f, f)
-	fx[fxi] = x,
-	fxi++,
+	x = min( max( x % 256, F[I] - f), F[I] + f), // Clamp the change since last sample between (-f, f)
+	F[I] = x,
+	I++,
 	x
 ),
 
 // Sounds kinda off, and hipass+lopas=/=original when you use ^, but + sounds harsher
 hp = hipass = (x, f) => (x % 256) ^ lp(x, f),
 
-//sp = speed
-lim = limiter = (x, sp = .1) => (
-	//x &= 255,
-	mi = fx[fxi] = min( fx[fxi] + sp, x, 255),
-	mx = fx[fxi + 1] = max( fx[fxi + 1] - sp, x, mi+9),
-	fxi += 2,
-	(x-mi) * 255/(mx-mi)
-),
+lim = limiter = (input, speed = .1, lookahead = 512, wet = 1, thresh = 9, bias = 9, iters = 4, saturate = 0, p = 0) => {
+	x = y => I + 2 + ( T + y|0 ) % lookahead;
+	F[ x(0) ] = input; //newest in buffer, equivalent to F[ x(lookahead) ]
+	o = F[ x(1) ]; //oldest in buffer
+	mi = mx = o;
+	for( i=1; i <= iters; i++) { //older to newest
+		y = p ? ( i / (iters+1) ) ** p : 0;
+		z = F[ x( ( i + sin(i)/2 ) * lookahead / iters ) ]; //sin(i) is for hum reduction
+		mi = min( mi, z * (1-y) + o * y );
+		mx = max( mx, z * (1-y) + o * y );
+	}
+	mi = F[ I ] = min( mi, F[ I ] + speed );
+	mx = F[ I+1 ] = max( mx, F[ I+1 ] - speed * ( bias + 1 ), mi + ( t ? thresh : 255 ) ); //could probably be 99
+	I += 2 + lookahead;
+	return ds( ( o - mi ) * 255/(mx-mi), saturate ) * wet + o * (1-wet)
+	//return ds( ( o - mi ) * 2/(mx-mi) - 1, saturate ) * wet + o * (1-wet) //for floatbeat
+
+},
+
+cl = clip = x => min( 255, max(0, x)), //bytebeat
 
 //downsample
 //dsp = downsample = (x, res) => (
-//	x = fx[fxi] = t2 & res ? x : fx[fxi],
+//	x = F[I] = T & res ? x : F[I],
 //	x
 //),
 
@@ -131,18 +143,18 @@ hm = harmonify = (x,tone) => {
 
 // Instead of computing on the fly, this version computes a wavetable at the start
 // Side effects: you can't start the song at any t, and output is always full-volume
-hm3 = harmonify = (x, tone, waveTableSize = 256 * t2/t | 0 ) => {
+hm3 = harmonify = (x, tone, waveTableSize = 256 * T/t | 0 ) => {
 	//play from the buffer
-	if( t2 > waveTableSize) {
-		o = fx[ fxi + ( x * t2 / t & waveTableSize - 1) ];
-		fxi += waveTableSize;
+	if( T > waveTableSize) {
+		o = F[ I + ( x * T / t & waveTableSize - 1) ];
+		I += waveTableSize;
 		return o
 	}
 	//fill the buffer
 	for (i=0; i<8; i++) {
-		fx[ fxi + t2 ] ^= ( 1 & (tone>>i) ) * (i+1)/2 * t
+		F[ I + T ] ^= ( 1 & (tone>>i) ) * (i+1)/2 * t
 	}
-	fxi += waveTableSize;
+	I += waveTableSize;
 	//return x //not strictly necessary unless the wavetable size is large enough to notice silence at the start
 },
 
@@ -174,7 +186,7 @@ sy = synth = (melody, velTrack, speed, x, y, ...z)=>
 //saw 2 sine
 s2s = sinify = x => sin( x*PI/64 ) * 126 + 128,
 
-v = vibrato = sin(t2>>10)/2,
+v = vibrato = sin(T>>10)/2,
 
 ht = halftime = arr => (
 	arr = r(1,arr), //flatten
@@ -304,21 +316,21 @@ Bas = m( BS(.25) * lp( BSvel( 2e2 ), .01), .7) + m( lp( BS(999), 3), .3),
 
 
 
-//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x71060499, 1024 / PI * t2/t | 0), //octaved
-//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1.01, 0x72060499, 128 * t2/t | 0), //cool acid-y shamisen
+//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x71060499, 1024 / PI * T/t | 0), //octaved
+//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1.01, 0x72060499, 128 * T/t | 0), //cool acid-y shamisen
 //W = synth( mseq( w, 10 ),Wvel, 11, 1, 0x72060409), //muffled but still 2 high
-//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1.1, 0x73030409, 512 / PI * t2/t | 0), //sorta piano-ish
+//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1.1, 0x73030409, 512 / PI * T/t | 0), //sorta piano-ish
 //W = synth( mseq( w, 10 ), Wvel, 11, 1.5, 0x79018509), //sorta corny guitar
 //W = synth( mseq( w, 10 ), Wvel, 11, 1.6, 0x79018F10), //extreme guitar when lim((bas+W)&255)
 //W = synth( mseq( w, 10 ), Wvel, 11, 1.4, 0x79018F10), //dubsteppy thing when lim((bas+W)&255)
 //W = synth( mseq( w, 10 ), Wvel, 11, .5, 0x29020f10), //dubsteppy thing when lim(bas+W)
-//W = synth( sinify( mseq( w, 10 )) / 4, Wvel, 11, 1.1, 0x79018509, 1024 / PI * t2/t | 0), //guitar
+//W = synth( sinify( mseq( w, 10 )) / 4, Wvel, 11, 1.1, 0x79018509, 1024 / PI * T/t | 0), //guitar
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 10, 1.5, 0x79018509), //guitar 2
-//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 10, 1.1, 0x79098509, 256 / PI * t2/t | 0), //guitar oct up
-//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 10, 1, 0x81018509, 1024 / PI * t2/t | 0), //upright bass-ish
+//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 10, 1.1, 0x79098509, 256 / PI * T/t | 0), //guitar oct up
+//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 10, 1, 0x81018509, 1024 / PI * T/t | 0), //upright bass-ish
 //W = synth( mseq( w, 10 ),Wvel, 10, 2, 0x94010509), //just square
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 10, 2.1, 0x9501F509), //slappy
-//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 3.1, 0x9501F599, 1024 / PI * t2/t | 0), //weird
+//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 3.1, 0x9501F599, 1024 / PI * T/t | 0), //weird
 //W = synth( mseq( w, 10 ),Wvel, 11, 3.4, 0x9601FD99), //very trebly
 //W = synth( mseq( w, 10 ),Wvel, 11, 3.4, 0x09600F99), //pure phone ring
 //W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 10, 3.3, 0x03010F01), //buzzy superbassy
@@ -326,9 +338,9 @@ Bas = m( BS(.25) * lp( BSvel( 2e2 ), .01), .7) + m( lp( BS(999), 3), .3),
 W = synth( mseq( w, 10 ),Wvel, 10, 3.3, 0x0E020441), //cool acid-y bass
 //W = synth( mseq( w, 10 ),Wvel, 10, 3.3, 0x0E120310), //brosteppy
 //W = synth( mseq( w, 10 ),Wvel, 10, 5.7, 0x1E12010f)*.7, //goofy hi guitar
-//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 10, 2.1, 0x95010699, 1024 / PI * t2/t | 0), //weird2
-//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x2EEF0399, 1024 / PI * t2/t | 0), //octaved
-//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x04E00101, 1024 * t2/t | 0),//trumpet w/ buzz
+//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 10, 2.1, 0x95010699, 1024 / PI * T/t | 0), //weird2
+//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x2EEF0399, 1024 / PI * T/t | 0), //octaved
+//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1, 0x04E00101, 1024 * T/t | 0),//trumpet w/ buzz
 
 //LA = synth( mseq( la, 10 ) * 4, [1], 10, 3.3, 0x94010199), //super hi pitch bells
 //LA = synth( mseq( la, 10 ) * 1, [1], 10, 3.3, 0x95010599), //sorta octaved tri
@@ -350,7 +362,9 @@ Master = pan => (
 
 //lim( 
 
-lim( Bas * 1.5 + W/6 + W2/2 + (pan ? LA : LB)/4, .03 )
+//lim( Bas * 1.5 + W/6 + W2/2 + (pan ? LA : LB)/4, .1 )
+
+cl( Bas * 1.5 + W/6 + W2/2 + (pan ? LA : LB)/4 )
 
 //,.01)
 
@@ -364,7 +378,7 @@ lim( Bas * 1.5 + W/6 + W2/2 + (pan ? LA : LB)/4, .03 )
 
 //suck:
 //W = synth( mseq( w, 10 ),Wvel, 11, 3.3, 0x0D020FF1), //ultrahigh phone
-//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1.3, 0x36020399, 1024 / PI * t2/t | 0), //what
+//W = synth( sinify( mseq( w, 10 )) / 4,Wvel, 11, 1.3, 0x36020399, 1024 / PI * T/t | 0), //what
 //W = synth( mseq( w, 10 ) ,Wvel, 10, 3.26, 0x0E0204F1), //bleeps
 
 //hp( W, .5 + sin( t / (2 << 11) ) / 2)
