@@ -122,7 +122,7 @@ lim = limiter = (input, speed = .1, lookahead = 512, wet = 1, thresh = 9, bias =
 
 },
 
-cl = clip = x => min( 255, max(0, x)), //bytebeat
+cl = clip = x => min( 255, max(0, x - lp(x, .001) + 127)), //bytebeat
 
 //downsample
 //dsp = downsample = (x, res) => (
@@ -381,6 +381,8 @@ Master = pan => (
 //lim( Bas * 1.5 + W/6 + W2/2 + (pan ? LA : LB)/4, .1 )
 
 cl( Bas * 1.5 + W/6 + W2/2 + (pan ? LA : LB)/5 )
+
+//* 0 + cl( Bas + cl(Bas * 4)/2)
 
 //,.01)
 
