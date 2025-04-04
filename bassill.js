@@ -79,7 +79,14 @@ rv = reverb = (x, len = 16e3, feedb = .7, dry = .4, wet = 1, dsp = 2, T=T) => (
 ),
 
 
-lp = lopass = (x, f) => ( // f ~= frequency, but not 1:1
+//bad lopass (turns things into triangles rather than sins) but good for compressor
+lp2 = lopass = (input, freq, bias=1) => // f ~= frequency, but not 1:1
+	// F[I] is the value of the last sample
+	// You will need to change the 'x % 256' if you're using signed or floatbeat
+	F[I] = min( max( input, F[I] - freq), F[I++] + freq * bias)||0 // Clamp the change since last sample between (-f, f)
+,
+
+lp3 = lopass = (x, f) => ( // f ~= frequency, but not 1:1
 	// F[I] is the value of the last sample
 	// You will need to change the 'x % 256' if you're using signed or floatbeat
 	x = min( max( x % 256, F[I] - f), F[I] + f), // Clamp the change since last sample between (-f, f)
@@ -87,6 +94,11 @@ lp = lopass = (x, f) => ( // f ~= frequency, but not 1:1
 	I++,
 	x
 ),
+
+//better lopass, especially for hi-pass
+lp = (input,freq) =>
+	F[I] = F[I++] * (1-freq) + input * freq
+,
 
 // Sounds kinda off, and hipass+lopas=/=original when you use ^, but + sounds harsher
 hp = hipass = (x, f) => (x % 256) ^ lp(x, f),
@@ -167,7 +179,7 @@ hm3 = harmonify = (x, tone, waveTableSize = 256 * T/t | 0 ) => {
 // The next hex controls the decay
 // The next 2 hexes control the lowpass
 sy = synth = (melody, velTrack, speed, x, y, ...z)=>
-	lp(
+	lp3(
 		min(
 			m(
 				hm(
@@ -303,7 +315,7 @@ lb = r(1, [ lb1, lb2, lb1, lb3 ] ),
 swang = t-(t/4&256),
 
 //BS = x => sinify( lp( mseq( bs, 10, swang ), x * 2 ** ( seq( bsb, 10) / 12) ) ) ,
-BS = x => sinify( lp( mseq( bs, 10 ), x * 2 ** ( seq( bsb, 10) / 12) ) ) ,
+BS = x => sinify( lp3( mseq( bs, 10 ), x * 2 ** ( seq( bsb, 10) / 12) ) ) ,
 
 
 //BSvel = x => min ( 1, beat( bsv, 11, 1, x, swang ) ),
@@ -312,7 +324,7 @@ BSvel = x => min ( 1, beat( bsv, 11, 1, x ) ),
 
 //m( BS(.25) * lp( BSvel( 2e2 ), .01), .7) + m( BS(999) * lp( BSvel( 9e2 ), .01), .3)
 
-Bas = m( BS(.25) * lp( BSvel( 2e2 ), .01), .7) + m( lp( BS(999), 3), .3),
+Bas = m( BS(.25) * lp3( BSvel( 2e2 ), .01), .7) + m( lp3( BS(999), 3), .3),
 
 
 
@@ -345,9 +357,13 @@ W = synth( mseq( w, 10 ),Wvel, 10, 3.3, 0x0E020441), //cool acid-y bass
 //LA = synth( mseq( la, 10 ) * 4, [1], 10, 3.3, 0x94010199), //super hi pitch bells
 //LA = synth( mseq( la, 10 ) * 1, [1], 10, 3.3, 0x95010599), //sorta octaved tri
 //LA = synth( mseq( la, 10 ) * 2, [1], 10, 3.3, 0x73030409), //sorta guitar
+//LA = synth( mseq( la, 10 ) * 1, [1], 10, 3.3, 0x72060219), //shamisen-ish
+//LA = synth( mseq( la, 10 ) * 8, [1], 10, 3.3, 0x050103F1), //pleasant bell
+//LA = synth( mseq( la, 10 ) * 2, [1], 10, 5.7, 0x1E12030f), //piano ish sorta?
+//LA = synth( mseq( la, 10 ), [1], 10, 6, 0x5F120218), //marimba ish sorta
 
-LA = synth( mseq( la, 10 ) * 1, [1], 10, 3.3, 0x72060219), //shamisen-ish
-LB = synth( mseq( lb, 10 ) * 1, [1], 10, 3.3, 0x72060219), //shamisen-ish
+LA = synth( mseq( la, 10 ), [1], 10, 6, 0x5F120218), //marimba ish sorta
+LB = synth( mseq( lb, 10 ), [1], 10, 6, 0x5F120218),
 
 
 w2 = transpose( w, -5),
@@ -364,7 +380,7 @@ Master = pan => (
 
 //lim( Bas * 1.5 + W/6 + W2/2 + (pan ? LA : LB)/4, .1 )
 
-cl( Bas * 1.5 + W/6 + W2/2 + (pan ? LA : LB)/4 )
+cl( Bas * 1.5 + W/6 + W2/2 + (pan ? LA : LB)/5 )
 
 //,.01)
 
